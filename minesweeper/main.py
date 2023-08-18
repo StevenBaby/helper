@@ -149,6 +149,7 @@ class MainWindow(QMainWindow):
         self.label.setText("")
 
     def situation(self, pixmap: QPixmap = None):
+        time.sleep(0.3)
         if pixmap is None:
             pixmap = self.screenshot()
         image = pixmap.toImage()
@@ -176,7 +177,11 @@ class MainWindow(QMainWindow):
 
         if len(rects) != 480:
             self.error = True
-            logger.error("recognize board error")
+            # cv2.imshow("error", thresh)
+            if len(rects) > 460:
+                cv2.imwrite(f"error/image_{int(time.time())}.png", image)
+                cv2.imwrite(f"error/thresh_{int(time.time())}.png", thresh)
+                logger.error(f"recognize board error rects {len(rects)}")
             return
 
         result = sorted(rects, key=lambda e: e[1])
@@ -384,10 +389,7 @@ class MainWindow(QMainWindow):
                     self.events.put((where, 0))
 
     def probability(self):
-        map = self.screenshot()
-        if not map:
-            return
-        board = self.situation(map)
+        board = self.situation()
         if board is None:
             return
         mark = board.copy()
@@ -404,7 +406,8 @@ class MainWindow(QMainWindow):
                 if not possible:
                     continue
                 if len(possible) <= 1:
-                    self.make_events()
+                    if self.events.empty():
+                        self.make_events()
                     # logger.debug(board)
                     # logger.error((where, board[where], possible))
                     return
@@ -448,17 +451,17 @@ class MainWindow(QMainWindow):
             if type == 0:
                 logger.debug(f"double click {where}")
                 pyautogui.click()
-                pyautogui.doubleClick()
-                pyautogui.doubleClick()
-                time.sleep(0.1)
+                pyautogui.click()
+                # pyautogui.doubleClick()
+                # pyautogui.doubleClick()
             elif type == 1:
                 logger.debug(f"right click {where}")
                 pyautogui.rightClick()
-                time.sleep(0.1)
             else:
                 pyautogui.click()
-                pyautogui.doubleClick()
-                pyautogui.doubleClick()
+                pyautogui.click()
+                # pyautogui.doubleClick()
+                # pyautogui.doubleClick()
                 # self.cursor().setPos(self.left + 20, 200)
                 # pyautogui.rightClick()
 
@@ -466,24 +469,18 @@ class MainWindow(QMainWindow):
                 if board is None:
                     self.running = False
                     return
-                time.sleep(0.1)
 
             if self.events.empty():
                 # self.cursor().setPos(self.left + 20, 200)
                 # pyautogui.rightClick()
                 self.make_events()
-                time.sleep(0.1)
             if self.events.empty():
                 self.probability()
-                time.sleep(0.1)
                 # self.cursor().setPos(self.left + 20, 200)
                 # pyautogui.rightClick()
 
     def make_events(self):
-        map = self.screenshot()
-        if not map:
-            return
-        board = self.situation(map)
+        board = self.situation()
         if board is None:
             return
 
@@ -500,7 +497,6 @@ class MainWindow(QMainWindow):
         if not self.running:
             self.click_thread = threading.Thread(target=self.do_click_events, daemon=True)
             self.click_thread.start()
-            # self.show_situation(board)
 
     def load_classifier(self):
         self.label.setText("Loading classifier ...")
@@ -516,6 +512,7 @@ class MainWindow(QMainWindow):
         if screen:
             self.setScreen(screen)
 
+        # self.setWindowFlag(Qt.WindowType.Tool)
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -556,7 +553,7 @@ class MainWindow(QMainWindow):
 
         self.label1 = QLabel(self)
         self.label1.setGeometry(0, geo.y(), geo.x(), geo.height())
-        self.label1.setStyleSheet("background-color: rgba(0, 0, 255, 5)")
+        self.label1.setStyleSheet("background-color: rgba(0, 0, 255, 2)")
         self.label1.show()
 
         self.events = queue.Queue()
@@ -572,7 +569,7 @@ class MainWindow(QMainWindow):
         if key == Qt.Key.Key_Return:
             self.signal.enter.emit()
             return
-        if key == Qt.Key.Key_Escape:
+        if key == Qt.Key.Key_Q:
             self.label.setVisible(False)
             return
         if key == Qt.Key.Key_T:
@@ -580,6 +577,9 @@ class MainWindow(QMainWindow):
             return
         if key == Qt.Key.Key_P:
             self.show_board()
+            return
+        if key == Qt.Key.Key_Escape:
+            self.close()
             return
         if key == Qt.Key.Key_H:
             for line in self.vlines:
