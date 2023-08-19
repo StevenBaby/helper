@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
     QLabel,
+    QMenu,
 )
 from PySide6.QtGui import (
     QGuiApplication,
@@ -21,6 +22,7 @@ from PySide6.QtGui import (
     QMouseEvent,
     QKeyEvent,
     QPainter,
+    QAction,
 )
 
 import mss
@@ -31,6 +33,7 @@ import numpy as np
 import tone
 import matplotlib.pyplot as plt
 import pyautogui
+import keyboard
 
 from logger import logger
 
@@ -65,8 +68,8 @@ class Line(QLabel):
 class Signal(QtCore.QObject):
 
     enter = QtCore.Signal(None)
-    right = QtCore.Signal(object)
-    click = QtCore.Signal(object)
+    toggle = QtCore.Signal(None)
+    quit = QtCore.Signal(None)
 
 
 class MainWindow(QMainWindow):
@@ -488,6 +491,7 @@ class MainWindow(QMainWindow):
         self.mark_action(board, result)
 
     def enter_event(self):
+        logger.debug("starting sweeper...")
         self.error = False
 
         self.make_events()
@@ -499,12 +503,21 @@ class MainWindow(QMainWindow):
             self.click_thread.start()
 
     def load_classifier(self):
-        self.label.setText("Loading classifier ...")
+        # self.label.setText("Loading classifier ...")
         self.classifier = tone.utils.learning.load_pickle(
             os.path.join(dirname, "model.pkl"))
         self.classifier.eval()
-        self.label.setText("")
+        # self.label.setText("")
         return self.classifier
+
+    def toggle_lines(self):
+        for line in self.vlines:
+            line.setVisible(not line.isVisible())
+        for line in self.hlines:
+            line.setVisible(not line.isVisible())
+
+    def quit_application(self):
+        QGuiApplication.quit()
 
     def __init__(self, screen=None) -> None:
         super().__init__()
@@ -512,7 +525,7 @@ class MainWindow(QMainWindow):
         if screen:
             self.setScreen(screen)
 
-        # self.setWindowFlag(Qt.WindowType.Tool)
+        self.setWindowFlag(Qt.WindowType.Tool)
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -520,10 +533,16 @@ class MainWindow(QMainWindow):
         self.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop)
         # self.setWindowOpacity(0.7)
         self.move(self.screen().geometry().topLeft())
-        self.showMaximized()
+        self.show()
 
         self.signal = Signal()
         self.signal.enter.connect(self.enter_event)
+        self.signal.toggle.connect(self.toggle_lines)
+        self.signal.quit.connect(self.quit_application)
+
+        keyboard.add_hotkey('ctrl+alt+enter', lambda: self.signal.enter.emit())
+        keyboard.add_hotkey('ctrl+alt+h', lambda: self.signal.toggle.emit())
+        keyboard.add_hotkey('ctrl+alt+q', lambda: self.signal.quit.emit())
 
         with mss.mss() as sct:
             if screen == QGuiApplication.screens()[0]:
@@ -534,6 +553,11 @@ class MainWindow(QMainWindow):
                 self.left = sct.monitors[1]['width']
 
         logger.debug(geo)
+
+        desktop = self.screen().geometry()
+        logger.debug(desktop)
+
+        self.setGeometry(QRect(desktop.left(), 0, desktop.width(), desktop.height()))
 
         self.vlines = [
             Line(self, pos=geo.x(), vertical=True),
@@ -551,10 +575,20 @@ class MainWindow(QMainWindow):
         self.label.setScaledContents(True)
         self.label.show()
 
-        self.label1 = QLabel(self)
-        self.label1.setGeometry(0, geo.y(), geo.x(), geo.height())
-        self.label1.setStyleSheet("background-color: rgba(0, 0, 255, 2)")
-        self.label1.show()
+        # self.label1 = QLabel(self)
+        # self.label1.setGeometry(0, geo.y(), geo.x(), geo.height())
+        # self.label1.setStyleSheet("background-color: rgba(0, 0, 255, 2)")
+        # self.label1.show()
+
+        self.icon = QPixmap(os.path.join(dirname, "images/favicon.ico"))
+        self.trayicon = QtWidgets.QSystemTrayIcon(self.icon, parent=self)
+        self.trayicon.show()
+
+        self.traymenu = QMenu(self)
+        self.traymenu.addAction("MineSweeper Helper")
+        quit = self.traymenu.addAction("Quit")
+        quit.triggered.connect(self.quit_application)
+        self.trayicon.setContextMenu(self.traymenu)
 
         self.events = queue.Queue()
         self.click_thread = None
@@ -579,13 +613,11 @@ class MainWindow(QMainWindow):
             self.show_board()
             return
         if key == Qt.Key.Key_Escape:
-            self.close()
+            self.signal.quit.emit()
             return
-        if key == Qt.Key.Key_H:
-            for line in self.vlines:
-                line.setVisible(not line.isVisible())
-            for line in self.hlines:
-                line.setVisible(not line.isVisible())
+        if key == Qt.Key.Key_L:
+            self.signal.toggle.emit()
+            return
         return super().keyPressEvent(event)
 
 
