@@ -61,6 +61,8 @@ class Mota(object):
         icons[321] = self.read_icon("materials/terrains.png", 12)
         icons[330] = self.read_icon("materials/terrains.png", 45)
         icons[322] = self.read_icon("materials/terrains.png", 0)
+        icons[323] = self.read_icon("materials/enemys.png", 7)
+        icons[324] = self.read_icon("materials/terrains.png", 0)
 
         # 宝石
         icons[27] = self.read_icon("materials/items.png", 16)
@@ -560,10 +562,15 @@ class Mota(object):
             case 129:  # 第 15 层特殊处理
                 if self.battle(where, 258):
                     self.update_floor(where, maps.S129[15])
-            case 123:  # 第 15 层特殊处理
-                self.update_floor(where, maps.S123[15])
+            case 123:  # 第 15 / 29 层特殊处理
+                self.update_floor(where, maps.S123[self.level])
             case 322:  # 第 20 层特殊处理
                 self.update_floor(where, maps.S322[20])
+            case 323:  # 第 20 层特殊处理
+                if self.battle(where, 208):
+                    self.update_floor(where, maps.S323[20])
+            case 324:  # 第 33 层特殊处理
+                self.update_floor(where, maps.S324[self.level])
             case 320:  # 圣水
                 self.collect(where, 320)
             case 321:  # 十字架
@@ -602,7 +609,7 @@ class Mota(object):
         m = MONSTERS[monster]
 
         attack = self.attack
-        if monster in (206, 213, 213):
+        if monster in (208, 213, 214) and 321 in self.things:  # 十字架
             attack *= 2
 
         if m.defense >= attack:
@@ -668,23 +675,27 @@ class Mota(object):
             case 27:  # 红宝石
                 if self.level <= 10:
                     self.attack += 1
-                else:
+                elif self.level <= 20:
                     self.attack += 2
             case 28:  # 蓝宝石
                 if self.level <= 10:
                     self.defense += 1
-                else:
+                elif self.level <= 20:
                     self.defense += 2
             case 31:  # 红药水
                 if self.level <= 10:
                     self.life += 50
-                else:
+                elif self.level <= 20:
                     self.life += 100
+                else:
+                    self.life += 200
             case 32:  # 蓝药水
                 if self.level <= 10:
                     self.life += 200
-                else:
+                elif self.level <= 20:
                     self.life += 400
+                else:
+                    self.life += 800
             case 35:  # 铁剑
                 self.attack += 10
             case 36:  # 铁盾
@@ -693,6 +704,8 @@ class Mota(object):
                 self.attack += 20
             case 38:  # 银盾
                 self.defense += 20
+            case 39:  # 骑士剑
+                self.attack += 40
             case _:
                 self.things.setdefault(thing, 0)
                 self.things[thing] += 1
