@@ -58,7 +58,9 @@ class Mota(object):
         icons[7] = self.read_icon("materials/terrains.png", 31)
         icons[8] = self.read_icon("materials/terrains.png", 32)
         icons[320] = self.read_icon("materials/terrains.png", 12)
+        icons[321] = self.read_icon("materials/terrains.png", 12)
         icons[330] = self.read_icon("materials/terrains.png", 45)
+        icons[322] = self.read_icon("materials/terrains.png", 0)
 
         # 宝石
         icons[27] = self.read_icon("materials/items.png", 16)
@@ -116,6 +118,9 @@ class Mota(object):
         icons[124] = self.read_icon("materials/npcs.png", 3)
         icons[125] = self.read_icon("materials/npcs.png", 4)
         icons[126] = self.read_icon("materials/enemys.png", 45)
+        icons[127] = self.read_icon("materials/terrains.png", 0)
+        icons[128] = self.read_icon("materials/enemys.png", 10)
+        icons[129] = self.read_icon("materials/enemys.png", 57)
         icons[131] = self.read_icon("materials/npcs.png", 10)  # 商店
         icons[132] = self.read_icon("materials/npcs.png", 11)  # 公主
 
@@ -138,9 +143,15 @@ class Mota(object):
             if key.startswith("keymap"):
                 mpl.rcParams[key] = []
 
-        family = {
-            "WenQuanYi Zen Hei",
-        }
+        if os.name == 'nt':
+            family = {
+                "Simhei"
+            }
+        else:
+            family = {
+                "WenQuanYi Zen Hei",
+            }
+
         fonts = matplotlib.font_manager.findSystemFonts(fontext='ttf')
 
         for fontfile in fonts:
@@ -224,11 +235,7 @@ class Mota(object):
     def next_price(self):
         return self.price + self.times * 20
 
-    def __init__(self) -> None:
-        logger.info("mota creating...")
-        self.resources = {}
-        self.icons = self.load_icons()
-
+    def init_state(self, actions=None):
         self.tower = np.copy(maps.M)
         self.level = 1
         self.max_level = 50
@@ -244,15 +251,27 @@ class Mota(object):
         self.times = 0
         self.state = 0
         self.mode = MODE_ADD
+        self.actions = []
+
+        if actions is not None:
+            for action in actions:
+                self.action(action)
+            self.actions = actions
+
+    def __init__(self) -> None:
+        logger.info("mota creating...")
+        self.resources = {}
+        self.icons = self.load_icons()
+        self.init_state()
 
         self.setup_matplotlib()
 
-        self.fig = plt.figure(figsize=(7, 5))
+        self.fig = plt.figure(figsize=(8, 5))
         self.fig.tight_layout()
         self.fig.subplots_adjust(
-            top=1, bottom=0, left=0,  right=1, hspace=0, wspace=0)
+            top=1, bottom=0, left=0, right=1, hspace=0, wspace=0)
 
-        gs = self.fig.add_gridspec(1, 7)
+        gs = self.fig.add_gridspec(1, 8)
 
         self.ax = self.fig.add_subplot(gs[0:5])
         self.ax2 = self.fig.add_subplot(gs[5:])
@@ -263,9 +282,9 @@ class Mota(object):
         self.img = self.ax.imshow(np.zeros((32 * 13, 32 * 13, 4)))
 
         self.fig.canvas.mpl_connect('key_press_event', self.key_press_event)
-        # self.fig.canvas.mpl_connect('button_press_event', self.click_event)
+        self.fig.canvas.mpl_connect('button_press_event', self.click_event)
 
-        self.ax2.imshow(np.zeros((5, 2, 4)) + 0.3)
+        self.ax2.imshow(np.zeros((5, 3, 4)) + 0.3)
         self.label = self.ax2.text(0, 2.5, "")
 
         # self.load_state()
@@ -276,43 +295,63 @@ class Mota(object):
     def floor(self):
         return self.tower[self.level]
 
-    def click_event(self, event):
+    def route(self, to: np.ndarray):
+        to = tuple(to)
+        wheres = [tuple(self.where)]
+        visited = set()
+        offsets = np.array([
+            [0, 1],
+            [0, -1],
+            [1, 0],
+            [-1, 0],
+        ])
+
+        while wheres:
+            pos = wheres.pop(0)
+            if pos == to:
+                logger.info("find route from %s to %s", tuple(self.where), to)
+                return True
+            if pos in visited:
+                continue
+            visited.add(pos)
+            for offset in offsets:
+                near = tuple(np.array(pos) + offset)
+                if near == to:
+                    wheres.append(near)
+                    break
+
+                if near in visited:
+                    continue
+
+                if self.floor[near] != 0:
+                    continue
+                wheres.append(near)
+
+        return False
+
+    def click_event(self, event: matplotlib.backend_bases.MouseEvent):
+        if event.inaxes != self.ax:
+            return
+        if self.state != attrs.STATE_NORMAL:
+            return
         logger.debug(event)
+        data = np.array([event.ydata, event.xdata]) // 32
+        data = data.astype(np.int32)
+        if self.route(data):
+            self.actions.append((self.state, data))
+            self.action_normal(data)
+
+        self.plotmap()
 
     def update_state(self, state=None):
         if state is not None:
             (
-                self.tower,
-                self.level,
-                self.min_level,
-                self.max_level,
-                self.where,
-                self.things,
-                self.life,
-                self.attack,
-                self.defense,
-                self.coin,
-                self.state,
-                self.price,
-                self.times,
-                self.mode,
+                actions,
             ) = state
+            self.init_state(actions)
         else:
             return (
-                self.tower,
-                self.level,
-                self.min_level,
-                self.max_level,
-                self.where,
-                self.things,
-                self.life,
-                self.attack,
-                self.defense,
-                self.coin,
-                self.state,
-                self.price,
-                self.times,
-                self.mode,
+                self.actions,
             )
 
     def save_state(self):
@@ -336,29 +375,7 @@ class Mota(object):
 
         self.plotmap()
 
-    def state_normal(self, event: matplotlib.backend_bases.KeyEvent):
-        # logger.debug(event)
-        where = None
-        match event.key:
-            case 'up':
-                where = np.array([-1, 0])
-            case 'down':
-                where = np.array([1, 0])
-            case 'left':
-                where = np.array([0, -1])
-            case 'right':
-                where = np.array([0, 1])
-            case 'ctrl+s':
-                self.save_state()
-            case 'ctrl+l':
-                self.load_state()
-            case _:
-                logger.info("key pressed %s", event.key)
-
-        if where is None:
-            return
-
-        where += self.where
+    def action_normal(self, where):
         spot = int(self.floor[tuple(where)])
 
         match spot:
@@ -376,15 +393,66 @@ class Mota(object):
             case _:
                 self.special(where, spot)
 
-    def state_altar(self, event: matplotlib.backend_bases.KeyEvent):
-        if event.key not in '123':
+    def key_normal(self, event: matplotlib.backend_bases.KeyEvent):
+        # logger.debug(event)
+        where = None
+        match event.key:
+            case 'up':
+                where = np.array([-1, 0])
+            case 'down':
+                where = np.array([1, 0])
+            case 'left':
+                where = np.array([0, -1])
+            case 'right':
+                where = np.array([0, 1])
+            case 'f' | 'pageup':
+                args = np.argwhere(self.floor == 87)
+                if len(args) == 0:
+                    return
+                where = tuple(args[0])
+                if self.route(where):
+                    self.actions.append((self.state, where))
+                    self.action_normal(where)
+                return
+            case 'd' | 'pagedown':
+                args = np.argwhere(self.floor == 88)
+                if len(args) == 0:
+                    return
+                where = tuple(args[0])
+                if self.route(where):
+                    self.actions.append((self.state, where))
+                    self.action_normal(where)
+                return
+            case 'ctrl+s':
+                self.save_state()
+            case 'ctrl+l':
+                self.load_state()
+            case 'ctrl+n':
+                self.init_state()
+            case _:
+                logger.info("key pressed %s", event.key)
+
+        if where is None:
+            return
+
+        where += self.where
+
+        self.actions.append((self.state, where))
+        self.action_normal(where)
+
+    def key_altar(self, event: matplotlib.backend_bases.KeyEvent):
+        self.actions.append((self.state, event.key))
+        self.action_altar(event.key)
+
+    def action_altar(self, param):
+        if param not in '123':
             self.state = STATE_NORMAL
             return
         if self.coin < self.next_price():
             logger.info("no enough coin")
             return
 
-        match event.key:
+        match param:
             case '1':
                 self.life += ALTARS[self.level].life
             case '2':
@@ -392,15 +460,19 @@ class Mota(object):
             case '3':
                 self.defense += ALTARS[self.level].defense
             case _:
-                logger.info("key pressed %s", event.key)
+                logger.info("key pressed %s", param)
                 return
 
         self.state = STATE_NORMAL
         self.coin -= self.next_price()
         self.times += 1
 
-    def state_merchant(self, event):
-        if event.key != '1':
+    def key_merchant(self, event):
+        self.actions.append((self.state, event.key))
+        self.action_merchant(event.key)
+
+    def action_merchant(self, param):
+        if param != '1':
             self.state = STATE_NORMAL
             return
         merchant = MERCHANTS[self.level]
@@ -424,47 +496,30 @@ class Mota(object):
             args = np.argwhere(self.floor == 122)[0]
             self.clear(args)
 
-    def super_state(self, event: matplotlib.backend_bases.KeyEvent):
-        match event.key.lower():
-            case 'f' | 'pageup':
-                if self.level >= self.max_level:
-                    return True
+        self.state = STATE_NORMAL
 
-                self.level += 1
-                args = np.argwhere(self.floor == 88)
-                if len(args) == 0:
-                    args = np.argwhere(self.floor == 87)
-                if len(args) == 0:
-                    return True
+    def action(self, act):
+        state, param = act
+        if self.state != state:
+            logger.error("state error %s != %s", self.state, state)
 
-                self.where = args[0]
-                return True
-            case 'd' | 'pagedown':
-                if self.level <= self.min_level:
-                    return True
-
-                self.level -= 1
-                args = np.argwhere(self.floor == 87)
-                if len(args) == 0:
-                    args = np.argwhere(self.floor == 88)
-                if len(args) == 0:
-                    return True
-                self.where = args[0]
-                return True
-        return False
+        match state:
+            case attrs.STATE_NORMAL:
+                self.action_normal(param)
+            case attrs.STATE_ALTAR:
+                self.action_altar(param)
+            case attrs.STATE_MERCHANT:
+                self.action_merchant(param)
 
     def key_press_event(self, event: matplotlib.backend_bases.KeyEvent):
-        if self.super_state(event):
-            self.plotmap()
-            return
-
+        # logger.debug(event.key)
         match self.state:
             case attrs.STATE_NORMAL:  # 正常
-                self.state_normal(event)
+                self.key_normal(event)
             case attrs.STATE_ALTAR:  # 祭坛
-                self.state_altar(event)
+                self.key_altar(event)
             case attrs.STATE_MERCHANT:
-                self.state_merchant(event)
+                self.key_merchant(event)
 
         self.plotmap()
 
@@ -472,10 +527,22 @@ class Mota(object):
         self.floor[tuple(where)] = 0
         self.where = where
 
+    def update_floor(self, where, floor):
+        floor = np.copy(floor)
+        args = np.argwhere(floor == -1)
+        for arg in args:
+            arg = tuple(arg)
+            floor[arg] = self.floor[arg]
+
+        self.tower[self.level] = floor
+        self.where = where
+
     def special(self, where, spot):
         logger.info("%s %s", where, spot)
         match spot:
             case 3:  # 暗墙
+                self.clear(where)
+            case 2:  # 暗墙
                 self.clear(where)
             case 126:  # 第三层特殊处理
                 self.life = 400
@@ -485,6 +552,23 @@ class Mota(object):
                 self.tower[3] = maps.S126[3]
                 self.level = 2
                 self.where = np.array([9, 1])
+            case 127:  # 第10层特殊处理
+                self.update_floor(where, maps.S127[10])
+            case 128:  # 第10层特殊处理
+                if self.battle(where, 211):
+                    self.update_floor(where, maps.S128[10])
+            case 129:  # 第 15 层特殊处理
+                if self.battle(where, 258):
+                    self.update_floor(where, maps.S129[15])
+            case 123:  # 第 15 层特殊处理
+                self.update_floor(where, maps.S123[15])
+            case 322:  # 第 20 层特殊处理
+                self.update_floor(where, maps.S322[20])
+            case 320:  # 圣水
+                self.collect(where, 320)
+            case 321:  # 十字架
+                self.collect(where, 321)
+
             case 121:  # 老头
                 self.clear(where)
                 self.things[121] = 1
@@ -495,31 +579,41 @@ class Mota(object):
                 # self.state_altar(None)
 
     def guard(self, where, monster):
-        if monster not in (221, ):
+        if self.level not in attrs.GUARDS:
             return
+        # logger.info("guard .....")
+        for gate, show, args in attrs.GUARDS[self.level]:
+            if self.floor[gate] == 0:
+                continue
 
-        args = np.argwhere(self.floor == monster)
-        if len(args) > 0:
-            return
-        match (self.level, monster):
-            case (8, 221):
-                self.floor[4, 10] = 0
+            Y = np.transpose(args)[0]
+            X = np.transpose(args)[1]
+            Z = self.floor[Y, X]
+
+            # logger.debug(args)
+            # logger.debug(Z)
+            if np.sum(Z) == 0:
+                self.floor[gate] = show
 
     def battle(self, where, monster):
         logger.debug("%s, %s", where, monster)
         if monster not in MONSTERS:
-            return
+            return False
         m = MONSTERS[monster]
 
-        if m.defense >= self.attack:
+        attack = self.attack
+        if monster in (206, 213, 213):
+            attack *= 2
+
+        if m.defense >= attack:
             logger.debug("monster defense >= attack")
-            return
+            return False
 
         mlife = m.life
         wlife = self.life
 
         while True:
-            harm = self.attack - m.defense
+            harm = attack - m.defense
             mlife -= harm
             if mlife <= 0:
                 break
@@ -531,15 +625,16 @@ class Mota(object):
                 break
 
         if wlife <= 0:
-            return
+            return False
 
         self.life = wlife
         self.coin += m.coin
         self.clear(where)
         self.guard(where, monster)
+        return True
 
     def open(self, where, gate):
-        logger.debug(f'%s, %s\n', where, gate)
+        logger.debug(f'%s, %s', where, gate)
         match gate:
             case 87:  # 上楼
                 self.level += 1
@@ -571,17 +666,33 @@ class Mota(object):
 
         match thing:
             case 27:  # 红宝石
-                self.attack += 1
+                if self.level <= 10:
+                    self.attack += 1
+                else:
+                    self.attack += 2
             case 28:  # 蓝宝石
-                self.defense += 1
+                if self.level <= 10:
+                    self.defense += 1
+                else:
+                    self.defense += 2
             case 31:  # 红药水
-                self.life += 50
+                if self.level <= 10:
+                    self.life += 50
+                else:
+                    self.life += 100
             case 32:  # 蓝药水
-                self.life += 200
+                if self.level <= 10:
+                    self.life += 200
+                else:
+                    self.life += 400
             case 35:  # 铁剑
                 self.attack += 10
             case 36:  # 铁盾
                 self.defense += 10
+            case 37:  # 银剑
+                self.attack += 20
+            case 38:  # 银盾
+                self.defense += 20
             case _:
                 self.things.setdefault(thing, 0)
                 self.things[thing] += 1
