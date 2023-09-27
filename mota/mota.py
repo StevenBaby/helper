@@ -63,6 +63,7 @@ class Mota(object):
         icons[322] = self.read_icon("materials/terrains.png", 0)
         icons[323] = self.read_icon("materials/enemys.png", 7)
         icons[324] = self.read_icon("materials/terrains.png", 0)
+        icons[325] = self.read_icon("materials/npcs.png", 2)
 
         # 宝石
         icons[27] = self.read_icon("materials/items.png", 16)
@@ -575,10 +576,14 @@ class Mota(object):
                 self.collect(where, 320)
             case 321:  # 十字架
                 self.collect(where, 321)
-
+            case 325:
+                self.clear(where)
+                self.tower[35][10, 4] = 0
             case 121:  # 老头
                 self.clear(where)
                 self.things[121] = 1
+                if self.level == 2:
+                    self.coin += 1000
             case 122:  # 商人
                 self.state = STATE_MERCHANT
             case 131:  # 祭坛
@@ -589,17 +594,19 @@ class Mota(object):
         if self.level not in attrs.GUARDS:
             return
         # logger.info("guard .....")
-        for gate, show, args in attrs.GUARDS[self.level]:
-            if self.floor[gate] == 0:
+        for params, args in attrs.GUARDS[self.level]:
+            if tuple(where) not in [tuple(arg) for arg in args]:
                 continue
 
             Y = np.transpose(args)[0]
             X = np.transpose(args)[1]
             Z = self.floor[Y, X]
+            if np.sum(Z) != 0:
+                continue
 
-            # logger.debug(args)
-            # logger.debug(Z)
-            if np.sum(Z) == 0:
+            if isinstance(params, tuple):
+                params = [params]
+            for gate, show in params:
                 self.floor[gate] = show
 
     def battle(self, where, monster):
@@ -677,11 +684,15 @@ class Mota(object):
                     self.attack += 1
                 elif self.level <= 20:
                     self.attack += 2
+                elif self.level <= 40:
+                    self.attack += 4
             case 28:  # 蓝宝石
                 if self.level <= 10:
                     self.defense += 1
                 elif self.level <= 20:
                     self.defense += 2
+                elif self.level <= 40:
+                    self.defense += 4
             case 31:  # 红药水
                 if self.level <= 10:
                     self.life += 50
