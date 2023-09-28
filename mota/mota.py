@@ -1,7 +1,9 @@
 
 import os
+import re
 import pickle
 import json
+import copy
 from collections import namedtuple
 
 import numpy as np
@@ -15,7 +17,7 @@ from logger import logger
 import maps
 from attrs import *
 import attrs
-
+import events
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -79,12 +81,12 @@ class Mota(object):
         icons[31] = self.read_icon("materials/items.png", 20)
         icons[32] = self.read_icon("materials/items.png", 21)
 
-        # 铁剑
-        icons[35] = self.read_icon("materials/items.png", 50)
-        icons[36] = self.read_icon("materials/items.png", 55)
-        icons[37] = self.read_icon("materials/items.png", 51)
-        icons[38] = self.read_icon("materials/items.png", 56)
-        icons[39] = self.read_icon("materials/items.png", 52)
+        icons[35] = self.read_icon("materials/items.png", 50)  # 铁剑
+        icons[36] = self.read_icon("materials/items.png", 55)  # 铁盾
+        icons[37] = self.read_icon("materials/items.png", 51)  # 银剑
+        icons[38] = self.read_icon("materials/items.png", 56)  # 银盾
+        icons[39] = self.read_icon("materials/items.png", 52)  # 骑士剑
+        icons[40] = self.read_icon("materials/items.png", 57)  # 骑士盾
 
         icons[41] = self.read_icon("materials/items.png", 53)
         icons[42] = self.read_icon("materials/items.png", 58)
@@ -95,6 +97,7 @@ class Mota(object):
         icons[46] = self.read_icon("materials/items.png", 12)
         icons[47] = self.read_icon("materials/items.png", 45)  # 锤子
         icons[49] = self.read_icon("materials/items.png", 43)  # 炸弹
+        icons[50] = self.read_icon("materials/items.png", 13)  # 瞬移
         icons[51] = self.read_icon("materials/items.png", 15)  # 升华之翼
 
         # 道具
@@ -255,6 +258,7 @@ class Mota(object):
         self.state = 0
         self.mode = MODE_ADD
         self.actions = []
+        self.events = copy.deepcopy(events.EVENTS)
 
         if actions is not None:
             for action in actions:
@@ -357,14 +361,12 @@ class Mota(object):
                 self.actions,
             )
 
-    def save_state(self):
-        filename = 'state.pkl'
+    def save_state(self, filename='state.pkl'):
         logger.info("save state %s", filename)
         with open(filename, 'wb') as file:
             file.write(pickle.dumps(self.update_state()))
 
-    def load_state(self):
-        filename = 'state.pkl'
+    def load_state(self, filename='state.pkl'):
         if not os.path.exists(filename):
             return
 
@@ -378,7 +380,63 @@ class Mota(object):
 
         self.plotmap()
 
+    def match_event(self, match, where):
+        if isinstance(match, list):
+            for var in match:
+                if not self.match_event(var, where):
+                    return False
+            return True
+        if isinstance(match, events.MatchWhere):
+            if match == where:
+                return True
+        elif isinstance(match, events.MatchValue):
+            for where, value in match.items():
+                if self.floor[where] != value:
+                    return False
+            return True
+        return False
+
+    def action_change(self, change):
+        match change:
+            case list():
+                for var in change:
+                    self.action_change(var)
+            case events.AssignFloor():
+                for key, value in change.items():
+                    self.floor[key] = value
+            case events.AssignAttr():
+                assert (hasattr(self, change.name))
+                setattr(self, change.name, change.value)
+            case events.ChangeAttr():
+                assert (hasattr(self, change.name))
+                setattr(self, change.name,
+                        change.value + getattr(self, change.name))
+            case events.AssignThings():
+                self.things.update(change)
+
+    def action_event(self, where):
+        where = tuple(where)
+        logger.debug("%s %s", where, self.floor[where])
+        if self.level not in self.events:
+            return
+
+        items = self.events[self.level]
+
+        for e in items[:]:
+            if not self.match_event(e.match, where):
+                continue
+            self.action_change(e.change)
+
+            e.times -= 1
+            logger.debug(e.times)
+            if e.times == 0:
+                items.remove(e)
+                logger.debug(items)
+
     def action_normal(self, where):
+        if isinstance(where, str):
+            return self.action_tool(where)
+
         spot = int(self.floor[tuple(where)])
 
         match spot:
@@ -393,11 +451,44 @@ class Mota(object):
                 self.open(where, spot)
             case spot if spot in range(200, 260):
                 self.battle(where, spot)
-            case _:
-                self.special(where, spot)
+            case spot if spot in (121, 3, 2):
+                self.clear(where)
+            case 122:  # 商人
+                self.state = STATE_MERCHANT
+            case 124:  # 回收商人
+                self.state = STATE_MERCHANT
+            case 131:  # 祭坛
+                self.state = STATE_ALTAR
+            # case _:
+                # self.special(where, spot)
+        self.action_event(where)
+
+    def action_tool(self, tool):
+        match tool:
+            case 'q':
+                if 50 not in self.things or self.things[50] <= 0:
+                    return
+                where = np.array([-6, -6]) + self.where
+                where = np.array([6, 6]) - where
+                logger.debug('fly to %s', where)
+                if self.floor[tuple(where)] == 0:
+                    self.where = where
+                    self.things[50] -= 1
+
+        # logger.debug(tool)
 
     def key_normal(self, event: matplotlib.backend_bases.KeyEvent):
         # logger.debug(event)
+        match = re.match(r'(ctrl|alt)\+(\d)', event.key)
+        if match:
+            match match.group(1):
+                case 'ctrl':
+                    self.save_state(filename=f'state.{match.group(2)}.pkl')
+                case 'alt':
+                    self.load_state(filename=f'state.{match.group(2)}.pkl')
+            logger.debug("save state %s", match.group(2))
+            return
+
         where = None
         match event.key:
             case 'up':
@@ -426,6 +517,9 @@ class Mota(object):
                     self.actions.append((self.state, where))
                     self.action_normal(where)
                 return
+            case 'q':
+                self.actions.append((self.state, event.key))
+                self.action_normal(event.key)
             case 'ctrl+s':
                 self.save_state()
             case 'ctrl+l':
@@ -523,7 +617,6 @@ class Mota(object):
                 self.key_altar(event)
             case attrs.STATE_MERCHANT:
                 self.key_merchant(event)
-
         self.plotmap()
 
     def clear(self, where):
@@ -646,7 +739,7 @@ class Mota(object):
         self.life = wlife
         self.coin += m.coin
         self.clear(where)
-        self.guard(where, monster)
+        # self.guard(where, monster)
         return True
 
     def open(self, where, gate):
@@ -719,6 +812,10 @@ class Mota(object):
                 self.defense += 20
             case 39:  # 骑士剑
                 self.attack += 40
+            case 40:  # 骑士盾
+                self.defense += 40
+            case 50:  # 瞬移
+                self.things[50] = 3
             case _:
                 self.things.setdefault(thing, 0)
                 self.things[thing] += 1

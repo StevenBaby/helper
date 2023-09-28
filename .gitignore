@@ -2,4 +2,4 @@
 *.pyc
 *l.pkl
 error/
-mota/state.pkl
+mota/state*.pkl
