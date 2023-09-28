@@ -21,6 +21,10 @@ class AssignThings(dict):
     ...
 
 
+class AssignSpecial(dict):
+    ...
+
+
 class MatchWhere(typing.NamedTuple):
     y: int
     x: int
@@ -375,8 +379,10 @@ EVENTS: dict[int, list[Event]] = {
         ),
         Event(
             MatchWhere(10, 6),
-            AssignAttr('special', {
-                (9, 6): 1,
+            AssignSpecial({
+                32: {
+                    (9, 6): 1,
+                }
             })
         ),
     ],
@@ -498,20 +504,22 @@ EVENTS: dict[int, list[Event]] = {
                     (4, 9): 225,
                 })
             ],
-            AssignAttr('special', {
-                (1, 6): 1,
-                (2, 2): 1,
-                (2, 3): 1,
-                (2, 4): 1,
-                (2, 8): 1,
-                (2, 9): 1,
-                (2, 10): 1,
-                (4, 3): 1,
-                (4, 4): 1,
-                (4, 5): 1,
-                (4, 7): 1,
-                (4, 8): 1,
-                (4, 9): 1,
+            AssignSpecial({
+                40: {
+                    (1, 6): 1,
+                    (2, 2): 1,
+                    (2, 3): 1,
+                    (2, 4): 1,
+                    (2, 8): 1,
+                    (2, 9): 1,
+                    (2, 10): 1,
+                    (4, 3): 1,
+                    (4, 4): 1,
+                    (4, 5): 1,
+                    (4, 7): 1,
+                    (4, 8): 1,
+                    (4, 9): 1,
+                }
             })
         ),
         Event(
@@ -556,4 +564,8 @@ EVENTS: dict[int, list[Event]] = {
             }),
         ),
     ],
+}
+
+SPECIALS = {
+
 }

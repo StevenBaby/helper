@@ -421,6 +421,8 @@ class Mota(object):
                         change.value + getattr(self, change.name))
             case events.AssignThings():
                 self.things.update(change)
+            case events.AssignSpecial():
+                self.special.update(change)
 
     def action_event(self, where):
         where = tuple(where)
@@ -645,6 +647,8 @@ class Mota(object):
                 self.key_altar(event)
             case attrs.STATE_MERCHANT:
                 self.key_merchant(event)
+
+        self.update_special()
         self.plotmap()
 
     def clear(self, where):
@@ -661,11 +665,18 @@ class Mota(object):
         if monster in (208, 213, 214) and 321 in self.things:  # 十字架
             attack *= 2
 
+        specials = {}
         special = 0
+
+        if self.level in self.special:
+            specials = self.special[self.level]
+
         where = tuple(where)
-        if where in self.special:
-            special = self.special[where]
-            logger.debug('special %s %s %s', where, special, self.special)
+        if where in specials:
+            special = specials[where]
+            logger.debug(
+                'special %s %s %s %s',
+                self.level, where, special, specials)
 
         if m.defense >= attack:
             # logger.debug("monster defense >= attack")
@@ -715,11 +726,18 @@ class Mota(object):
         match gate:
             case 87:  # 上楼
                 self.level += 1
+
+                if self.level == 44:
+                    self.level = 45
+
                 self.max_level = max(self.max_level, self.level)
                 self.where = np.argwhere(self.floor == 88)[0]
                 return
             case 88:  # 下楼
                 self.level -= 1
+                if self.level == 44:
+                    self.level = 43
+
                 self.min_level = min(self.min_level, self.level)
                 self.where = np.argwhere(self.floor == 87)[0]
                 return
@@ -787,6 +805,9 @@ class Mota(object):
             case _:
                 self.things.setdefault(thing, 0)
                 self.things[thing] += 1
+
+    def update_special(self):
+        pass
 
 
 if __name__ == '__main__':
