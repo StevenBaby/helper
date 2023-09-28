@@ -12,6 +12,7 @@ import matplotlib.backend_bases
 import matplotlib as mpl
 import matplotlib.font_manager
 import matplotlib.ft2font
+from PIL import ImageDraw, Image, ImageFont
 
 from logger import logger
 import maps
@@ -24,28 +25,20 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 class Mota(object):
 
-    def read_resource(self, filename: str):
+    def read_resource(self, filename: str) -> Image:
         if filename not in self.resources:
-            img = plt.imread(filename)
-            if img.shape[2] == 3:
-                img = np.dstack((img, np.ones_like(img[:, :, 0])))
+            img = Image.open(filename).convert("RGBA")
             self.resources[filename] = img
-
         return self.resources[filename]
 
     def read_ground(self):
         img = self.read_resource("materials/terrains.png")
-        return img[0: 32, :32]
+        return img.crop((0, 0, 32, 32))
 
     def read_icon(self, filename: str, i: int):
         img = self.read_resource(filename)
-        icon = img[i * 32: (i + 1) * 32, :32]
-        alpha = np.expand_dims(icon[:, :, 3], 2)
-
-        icon[:, :, :] = alpha * icon[:, :, :] + \
-            (1 - alpha) * self.read_ground()
-
-        return icon
+        img = img.crop((0, i * 32, 32, (i + 1) * 32))
+        return Image.alpha_composite(self.read_ground(), img)
 
     def load_icons(self):
         icons = {}
@@ -170,28 +163,40 @@ class Mota(object):
 
         mpl.rcParams['font.family'] = list(family)
 
-    def plotmap(self):
-        # logger.debug("plot map where %s", self.where)
-        map = self.tower[self.level]
+    def plotharm(self, icon, where, idx):
+        if idx not in MONSTERS:
+            return icon
 
-        canvas = np.zeros((32 * 13, 32 * 13, 4))
+        harmful = self.harmful(where, idx)
+        # logger.debug(harmful)
+        text = Image.new("RGBA", (32, 32))
+        draw = ImageDraw.Draw(text)
+        draw.text((2, 22), str(harmful), fill='#000000cc',)
+        draw.text((1, 21), str(harmful), fill='#db2828ff',)
+
+        combined = Image.alpha_composite(icon, text)
+        return combined
+
+    def ploticon(self, where: tuple, idx: int, canvas: np.ndarray):
+        if idx not in self.icons:
+            return
+        i, j = where
+        icon = self.icons[idx]
+        icon = self.plotharm(icon, where, idx)
+
+        canvas.paste(icon, (j * 32, i * 32))
+
+    def plotmap(self):
+        canvas = Image.new("RGBA", (32 * 13, 32 * 13))
         for i in range(13):
             for j in range(13):
-                if map[i, j] not in self.icons:
+                if self.floor[(i, j)] not in self.icons:
                     continue
-                canvas[
-                    i * 32: (i + 1) * 32,
-                    j * 32: (j + 1) * 32
-                ] = self.icons[map[i, j]]
+                self.ploticon((i, j), self.floor[(i, j)], canvas)
 
-        i, j = self.where
+        self.ploticon(self.where, 1000, canvas)
 
-        canvas[
-            i * 32: (i + 1) * 32,
-            j * 32: (j + 1) * 32
-        ] = self.icons[1000]
-
-        self.img.set_data(canvas)
+        self.img.set_data(np.array(canvas))
         self.update_labels()
 
         self.fig.canvas.draw()
@@ -248,6 +253,7 @@ class Mota(object):
         self.min_level = 0
         self.where = np.array((11, 6))
         self.things = {}
+        self.special = {}
 
         self.life = 1000
         self.attack = 100
@@ -316,7 +322,7 @@ class Mota(object):
         while wheres:
             pos = wheres.pop(0)
             if pos == to:
-                logger.info("find route from %s to %s", tuple(self.where), to)
+                # logger.info("find route from %s to %s", tuple(self.where), to)
                 return True
             if pos in visited:
                 continue
@@ -344,6 +350,7 @@ class Mota(object):
         logger.debug(event)
         data = np.array([event.ydata, event.xdata]) // 32
         data = data.astype(np.int32)
+        logger.debug("click location %s %s", data, self.floor[tuple(data)])
         if self.route(data):
             self.actions.append((self.state, data))
             self.action_normal(data)
@@ -407,6 +414,7 @@ class Mota(object):
             case events.AssignAttr():
                 assert (hasattr(self, change.name))
                 setattr(self, change.name, change.value)
+                logger.debug("set attr %s %s", change.name, change.value)
             case events.ChangeAttr():
                 assert (hasattr(self, change.name))
                 setattr(self, change.name,
@@ -416,7 +424,7 @@ class Mota(object):
 
     def action_event(self, where):
         where = tuple(where)
-        logger.debug("%s %s", where, self.floor[where])
+        # logger.debug("%s %s", where, self.floor[where])
         if self.level not in self.events:
             return
 
@@ -428,10 +436,10 @@ class Mota(object):
             self.action_change(e.change)
 
             e.times -= 1
-            logger.debug(e.times)
+            # logger.debug(e.times)
             if e.times == 0:
                 items.remove(e)
-                logger.debug(items)
+                # logger.debug(items)
 
     def action_normal(self, where):
         if isinstance(where, str):
@@ -441,7 +449,7 @@ class Mota(object):
 
         match spot:
             case attrs.WALL:
-                logger.debug("wall...")
+                # logger.debug("wall...")
                 return
             case attrs.EMPTY:
                 self.where = where
@@ -465,8 +473,10 @@ class Mota(object):
 
     def action_tool(self, tool):
         match tool:
-            case 'q':
-                if 50 not in self.things or self.things[50] <= 0:
+            case 'q':  # 瞬移
+                if 50 not in self.things:
+                    return
+                if self.things[50] <= 0:
                     return
                 where = np.array([-6, -6]) + self.where
                 where = np.array([6, 6]) - where
@@ -474,6 +484,23 @@ class Mota(object):
                 if self.floor[tuple(where)] == 0:
                     self.where = where
                     self.things[50] -= 1
+                if self.things[50] == 0:
+                    del self.things[50]
+            case 'w':  # 破墙镐
+                if 47 not in self.things:
+                    return
+                if self.things[47] <= 0:
+                    return
+                for offset in np.array([[1, 0], [-1, 0], [0, 1], [0, -1]]):
+                    where = self.where + offset
+                    if set(where) & {0, 12}:
+                        continue
+                    if self.floor[tuple(where)] != 1:
+                        continue
+                    self.floor[tuple(where)] = 0
+                    self.things[47] = 0
+                if self.things[47] == 0:
+                    del self.things[47]
 
         # logger.debug(tool)
 
@@ -517,7 +544,7 @@ class Mota(object):
                     self.actions.append((self.state, where))
                     self.action_normal(where)
                 return
-            case 'q':
+            case 'q' | 'w':
                 self.actions.append((self.state, event.key))
                 self.action_normal(event.key)
             case 'ctrl+s':
@@ -527,7 +554,8 @@ class Mota(object):
             case 'ctrl+n':
                 self.init_state()
             case _:
-                logger.info("key pressed %s", event.key)
+                # logger.info("key pressed %s", event.key)
+                ...
 
         if where is None:
             return
@@ -623,127 +651,67 @@ class Mota(object):
         self.floor[tuple(where)] = 0
         self.where = where
 
-    def update_floor(self, where, floor):
-        floor = np.copy(floor)
-        args = np.argwhere(floor == -1)
-        for arg in args:
-            arg = tuple(arg)
-            floor[arg] = self.floor[arg]
-
-        self.tower[self.level] = floor
-        self.where = where
-
-    def special(self, where, spot):
-        logger.info("%s %s", where, spot)
-        match spot:
-            case 3:  # 暗墙
-                self.clear(where)
-            case 2:  # 暗墙
-                self.clear(where)
-            case 126:  # 第三层特殊处理
-                self.life = 400
-                self.attack = 10
-                self.defense = 10
-                self.tower[2] = maps.S126[2]
-                self.tower[3] = maps.S126[3]
-                self.level = 2
-                self.where = np.array([9, 1])
-            case 127:  # 第10层特殊处理
-                self.update_floor(where, maps.S127[10])
-            case 128:  # 第10层特殊处理
-                if self.battle(where, 211):
-                    self.update_floor(where, maps.S128[10])
-            case 129:  # 第 15 层特殊处理
-                if self.battle(where, 258):
-                    self.update_floor(where, maps.S129[15])
-            case 123:  # 第 15 / 29 层特殊处理
-                self.update_floor(where, maps.S123[self.level])
-            case 322:  # 第 20 层特殊处理
-                self.update_floor(where, maps.S322[20])
-            case 323:  # 第 20 层特殊处理
-                if self.battle(where, 208):
-                    self.update_floor(where, maps.S323[20])
-            case 324:  # 第 33 层特殊处理
-                self.update_floor(where, maps.S324[self.level])
-            case 320:  # 圣水
-                self.collect(where, 320)
-            case 321:  # 十字架
-                self.collect(where, 321)
-            case 325:
-                self.clear(where)
-                self.tower[35][10, 4] = 0
-            case 121:  # 老头
-                self.clear(where)
-                self.things[121] = 1
-                if self.level == 2:
-                    self.coin += 1000
-            case 122:  # 商人
-                self.state = STATE_MERCHANT
-            case 124:  # 回收商人
-                self.state = STATE_MERCHANT
-            case 131:  # 祭坛
-                self.state = STATE_ALTAR
-                # self.state_altar(None)
-
-    def guard(self, where, monster):
-        if self.level not in attrs.GUARDS:
-            return
-        # logger.info("guard .....")
-        for params, args in attrs.GUARDS[self.level]:
-            if tuple(where) not in [tuple(arg) for arg in args]:
-                continue
-
-            Y = np.transpose(args)[0]
-            X = np.transpose(args)[1]
-            Z = self.floor[Y, X]
-            if np.sum(Z) != 0:
-                continue
-
-            if isinstance(params, tuple):
-                params = [params]
-            for gate, show in params:
-                self.floor[gate] = show
-
-    def battle(self, where, monster):
-        logger.debug("%s, %s", where, monster)
+    def harmful(self, where, monster):
         if monster not in MONSTERS:
-            return False
+            return -1
+
         m = MONSTERS[monster]
 
         attack = self.attack
         if monster in (208, 213, 214) and 321 in self.things:  # 十字架
             attack *= 2
 
+        special = 0
+        where = tuple(where)
+        if where in self.special:
+            special = self.special[where]
+            logger.debug('special %s %s %s', where, special, self.special)
+
         if m.defense >= attack:
-            logger.debug("monster defense >= attack")
-            return False
+            # logger.debug("monster defense >= attack")
+            return -1
 
         mlife = m.life
-        wlife = self.life
+        total = 0
+
+        harm = attack - m.defense
+        hurt = m.attack - self.defense
+        if special == 1 and hurt > 0:  # 先攻
+            total += hurt
 
         while True:
-            harm = attack - m.defense
             mlife -= harm
             if mlife <= 0:
                 break
 
-            harm = m.attack - self.defense
-            if harm > 0:
-                wlife -= harm * self.mode
-            if wlife <= 0:
-                break
+            if hurt > 0:
+                total += hurt
 
-        if wlife <= 0:
+        return total
+
+    def battle(self, where, monster):
+        # logger.debug("%s, %s", where, monster)
+        wlife = self.harmful(where, monster)
+        if wlife < 0:
             return False
 
-        self.life = wlife
+        life = self.life - wlife * self.mode
+        if life <= 0:
+            return False
+
+        m = MONSTERS[monster]
+        self.life = life
         self.coin += m.coin
         self.clear(where)
+
+        where = tuple(where)
+        if where in self.special:
+            del self.special[where]
         # self.guard(where, monster)
         return True
 
     def open(self, where, gate):
-        logger.debug(f'%s, %s', where, gate)
+        # logger.debug(f'open %s, %s', where, gate)
         match gate:
             case 87:  # 上楼
                 self.level += 1
@@ -770,7 +738,7 @@ class Mota(object):
         self.clear(where)
 
     def collect(self, where, thing):
-        logger.debug('collect %s', thing)
+        # logger.debug('collect %s', thing)
         self.clear(where)
 
         match thing:
