@@ -495,7 +495,7 @@ class Mota(object):
 
         self.life += merchant.life
 
-        if self.level in [7, ]:
+        if self.level in [6, 7, 12, 15, 31, 38, 39]:
             args = np.argwhere(self.floor == 122)[0]
             self.clear(args)
 
@@ -585,6 +585,8 @@ class Mota(object):
                 if self.level == 2:
                     self.coin += 1000
             case 122:  # 商人
+                self.state = STATE_MERCHANT
+            case 124:  # 回收商人
                 self.state = STATE_MERCHANT
             case 131:  # 祭坛
                 self.state = STATE_ALTAR

@@ -55,9 +55,14 @@ ALTARS = {
 Merchant = namedtuple("Merchant", ['coin', 'yellow', 'blue', 'red', 'life'])
 
 MERCHANTS = {
-    7: Merchant(50, 5, 0, 0, 0),
+    6: Merchant(50, 5, 0, 0, 0),
+    7: Merchant(50, 0, 1, 0, 0),
     12: Merchant(800, 0, 0, 1, 0),
     15: Merchant(200, 0, 1, 0, 0),
+    28: Merchant(-100, -1, 0, 0, 0),
+    31: Merchant(1000, 4, 1, 0, 0),
+    38: Merchant(200, 3, 0, 0, 0),
+    39: Merchant(2000, 0, 3, 0, 0),
 }
 
 GUARDS = {
