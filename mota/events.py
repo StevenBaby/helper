@@ -104,7 +104,7 @@ EVENTS: dict[int, list[Event]] = {
         Event(
             MatchWhere(4, 11),
             AssignThings({
-                121: 1,
+                45: 1,
             })
         ),
     ],
@@ -227,7 +227,7 @@ EVENTS: dict[int, list[Event]] = {
             MatchWhere(11, 11),
             [
                 AssignFloor({(11, 11): 0, }),
-                AssignThings({320: 1}),
+                AssignThings({56: 1}),
             ]
         ),
     ],
@@ -274,7 +274,7 @@ EVENTS: dict[int, list[Event]] = {
             MatchWhere(3, 6),
             [
                 AssignFloor({(3, 6): 0, }),
-                AssignThings({321: 1}),
+                AssignThings({55: 1}),
             ]
         ),
     ],

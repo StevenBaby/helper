@@ -460,21 +460,9 @@ class Game(object):
                 items.remove(e)
 
     def action_tool(self, tool):
-        tools = {
-            'q': 50,  # 瞬移
-            'w': 47,  # 破墙镐
-            'e': 57,  # 地震卷轴
-            'r': 49,  # 炸弹
-            't': 51,  # 上楼器
-            'y': 26,  # 魔法钥匙
-            'u': 52,  # 下楼器
-            'i': 54,  # 冰冻徽章
-            'o': 320,  # 圣水
-        }
-
-        if tool not in tools:
+        if tool not in TOOLS:
             return
-        thing = tools[tool]
+        thing = TOOLS[tool]
         if thing not in self.things:
             return
         assert (self.things[thing] > 0)
@@ -559,8 +547,11 @@ class Game(object):
             return
 
         merchant = MERCHANTS[self.level]
-        if self.coin < merchant.coin:
+        if merchant.coin > 0 and self.coin < merchant.coin:
             logger.info("no enough coin")
+            return
+        if merchant.yellow < 0 and self.things[21] == 0:
+            logger.info("no yellow key")
             return
 
         self.coin -= merchant.coin

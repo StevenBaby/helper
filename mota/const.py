@@ -103,3 +103,18 @@ class MASK(enum.Enum):
     MASK_VALID1 = enum.auto()
     MASK_VALID2 = enum.auto()
     MASK_VALID3 = enum.auto()
+
+
+TOOLS = {
+    'q': 50,  # 瞬移
+    'w': 47,  # 破墙镐
+    'e': 57,  # 地震卷轴
+    'r': 49,  # 炸弹
+    't': 51,  # 上楼器
+    'y': 26,  # 魔法钥匙
+    'u': 52,  # 下楼器
+    'i': 54,  # 冰冻徽章
+    'o': 56,  # 圣水
+}
+
+TOOLKEYS = {v: k for k, v in TOOLS.items()}

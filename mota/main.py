@@ -85,6 +85,7 @@ class Mota(object):
         icons[42] = self.read_icon("items.png", 58)
         icons[43] = self.read_icon("items.png", 54)
         icons[44] = self.read_icon("items.png", 59)
+        icons[45] = self.read_icon("items.png", 9)  # 怪物手册
 
         # 工具
         icons[46] = self.read_icon("items.png", 12)  # 飞行器
@@ -97,6 +98,9 @@ class Mota(object):
         icons[52] = self.read_icon("items.png", 14)  # 下楼器
         icons[53] = self.read_icon("items.png", 11)  # 幸运金币
         icons[54] = self.read_icon("items.png", 41)  # 冰冻徽章
+        icons[55] = self.read_icon("items.png", 40)  # 十字架
+        icons[56] = self.read_icon("items.png", 29)  # 圣水
+        icons[57] = self.read_icon("items.png", 8)  # 地震卷轴
         icons[62] = self.read_icon("items.png", 42)  # 屠龙匕
 
         icons[73] = self.read_icon("items.png", 10)  # 记事本
@@ -133,7 +137,12 @@ class Mota(object):
         for i in range(60):
             icons[201 + i] = self.read_icon("enemys.png", i)
 
-        icons[1000] = self.read_icon("hero.png", 0)
+        icons[1000] = self.read_icon("hero.png", 0)  # 人
+        icons[1001] = self.read_icon("icons.png", 0)  # 楼梯
+        icons[1002] = self.read_icon("icons.png", 3)  # ♥
+        icons[1003] = self.read_icon("icons.png", 4)  # 攻击
+        icons[1004] = self.read_icon("icons.png", 5)  # 防御
+        icons[1005] = self.read_icon("icons.png", 7)  # 金币
 
         return icons
 
@@ -153,20 +162,24 @@ class Mota(object):
                 "WenQuanYi Zen Hei",
             }
         mpl.rcParams['font.family'] = list(family)
-        # fonts = matplotlib.font_manager.findSystemFonts(fontext='ttf')
+        fonts = matplotlib.font_manager.findSystemFonts(fontext='ttf')
 
-        # for fontfile in fonts:
-        #     try:
-        #         font = matplotlib.ft2font.FT2Font(fontfile)
-        #         logger.debug("find font name %s", font.family_name)
-        #         logger.debug("find path %s", fontfile)
-        #     except Exception as e:
-        #         continue
+        for fontfile in fonts:
+            try:
+                font = matplotlib.ft2font.FT2Font(fontfile)
+                logger.debug("find font name %s", font.family_name)
+                logger.debug("find path %s", fontfile)
+            except Exception as e:
+                continue
+
+    def create_image(self):
+        img = Image.new("RGBA", (32 * 18, 32 * 13))
+        return img
 
     def create_background(self):
-        img = Image.new("RGBA", (32 * 13, 32 * 13))
+        img = self.create_image()
         icon = self.icons[0]
-        for i, j in itertools.product(range(13), range(13)):
+        for i, j in itertools.product(range(13), range(18)):
             img.paste(icon, (j * 32, i * 32))
         return img
 
@@ -217,13 +230,68 @@ class Mota(object):
         i, j = where
         canvas.paste(icon, (j * 32, i * 32))
 
+    def plottext(self, canvas, text, where, height=1):
+        icon = Image.new("RGBA", (32 * 5, 32 * height))
+        draw = ImageDraw.Draw(icon)
+        font = ImageFont.truetype('simhei.ttf', 12)
+        # draw.rectangle((2, 10, 30, 20), fill='#00000077')
+        draw.text((4, 11), str(text), fill='#2185d0', font=font,
+                  stroke_width=2,
+                  stroke_fill="#ffffffcc")
+        self.paste_icon(canvas, icon, (where))
+
+    def plotinfo(self, canvas, text):
+        if self.game.state != game.STATE_NORMAL:
+            self.plottext(canvas, self.game.message(), (0, 13), height=13)
+            return
+
+        self.paste_icon(canvas, self.icons[1001], (0, 13))
+        self.plottext(text, self.game.level, (0, 13))
+
+        self.paste_icon(canvas, self.icons[1002], (1, 13))
+        self.plottext(text, self.game.life, (1, 13))
+
+        self.paste_icon(canvas, self.icons[1003], (2, 13))
+        self.plottext(text, self.game.attack, (2, 13))
+
+        self.paste_icon(canvas, self.icons[1004], (3, 13))
+        self.plottext(text, self.game.defense, (3, 13))
+
+        self.paste_icon(canvas, self.icons[1005], (4, 13))
+        self.plottext(text, self.game.coin, (4, 13))
+
+        idx = 0
+        for var in (21, 22, 23):
+            self.paste_icon(canvas, self.icons[var], (idx, 14))
+            self.plottext(text, self.game.things.get(var, 0), (idx, 14))
+            idx += 1
+
+        idx = 0
+        for var in self.game.things:
+            if var in (21, 22, 23):
+                continue
+            if var not in self.icons:
+                continue
+            self.paste_icon(canvas, self.icons[var], (idx, 15))
+            info = ''
+            if var in TOOLKEYS:
+                info = TOOLKEYS[var]
+
+            count = self.game.things.get(var, 0)
+            if count > 1:
+                info += f' {count}'
+
+            if info:
+                self.plottext(text, info, (idx, 15))
+            idx += 1
+
     def update(self, game: game.Game = None):
         if game is None:
             game = self.game
 
-        canvas = Image.new("RGBA", (32 * 13, 32 * 13))
-        domain = Image.new("RGBA", (32 * 13, 32 * 13))
-        mask = Image.new("RGBA", (32 * 13, 32 * 13))
+        canvas = self.create_image()
+        domain = self.create_image()
+        mask = self.create_image()
 
         for i, j in itertools.product(range(13), range(13)):
             idx = game.floor[i, j]
@@ -236,7 +304,9 @@ class Mota(object):
             self.plotdomain((i, j), idx, domain)
             self.plotmask((i, j), idx, mask)
 
-        hero = Image.new("RGBA", (32 * 13, 32 * 13))
+        self.plotinfo(canvas, domain)
+
+        hero = self.create_image()
         self.paste_icon(hero, self.icons[1000], game.where)
 
         out = Image.alpha_composite(self.background, canvas)
@@ -255,7 +325,7 @@ class Mota(object):
 
         self.setup_matplotlib()
 
-        self.fig = plt.figure(figsize=(6, 6))
+        self.fig = plt.figure(figsize=(18, 13))
         self.fig.tight_layout()
         self.fig.subplots_adjust(
             top=1,
