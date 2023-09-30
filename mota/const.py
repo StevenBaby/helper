@@ -1,4 +1,5 @@
 from collections import namedtuple
+import enum
 
 import numpy as np
 
@@ -92,3 +93,13 @@ MERCHANTS = {
     45: Merchant(1000, 0, 0, 0, 2000, 0, 0, ),
     47: Merchant(4000, 0, 0, 0, 0, 1, 0, ),
 }
+
+
+class MASK(enum.Enum):
+    MASK_EMPTY = enum.auto()
+    MASK_UNKNOWN = enum.auto()
+    MASK_VISITED = enum.auto()
+    MASK_INVALID = enum.auto()
+    MASK_VALID1 = enum.auto()
+    MASK_VALID2 = enum.auto()
+    MASK_VALID3 = enum.auto()

@@ -4,3 +4,4 @@
 error/
 mota/state*.pkl
 mota/state*.json
+state*.csv
