@@ -293,7 +293,12 @@ EVENTS: dict[int, list[Event]] = {
             ]
         ),
         Event(
-            MatchWhere(6, 6),
+            [
+                MatchValue({
+                    (6, 6): 0,
+                }),
+                MatchWhere(6, 6),
+            ],
             AssignFloor({
                 (3, 6): 0,
                 (4, 5): a([21, 21, 21]).reshape(1, 3),

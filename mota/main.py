@@ -240,6 +240,9 @@ class Mota(object):
                   stroke_fill="#ffffffcc")
         self.paste_icon(canvas, icon, (where))
 
+    def plotmessage(self, canvas, message):
+        self.plottext(canvas, message, (0, 13), height=13)
+
     def plotinfo(self, canvas, text):
         if self.game.state != game.STATE_NORMAL:
             self.plottext(canvas, self.game.message(), (0, 13), height=13)
@@ -285,7 +288,7 @@ class Mota(object):
                 self.plottext(text, info, (idx, 15))
             idx += 1
 
-    def update(self, game: game.Game = None):
+    def update(self, game: game.Game = None, message=None):
         if game is None:
             game = self.game
 
@@ -304,7 +307,10 @@ class Mota(object):
             self.plotdomain((i, j), idx, domain)
             self.plotmask((i, j), idx, mask)
 
-        self.plotinfo(canvas, domain)
+        if message is not None:
+            self.plotmessage(canvas, message)
+        else:
+            self.plotinfo(canvas, domain)
 
         hero = self.create_image()
         self.paste_icon(hero, self.icons[1000], game.where)
@@ -370,10 +376,15 @@ class Mota(object):
         match event.key:
             case 'ctrl+s':
                 self.game.save_state()
+                self.update(message="状态已保存")
+                return
             case 'ctrl+l':
                 self.game.load_state()
+                self.update(message="状态已加载")
+                return
             case 'ctrl+n':
                 self.game.reset()
+                self.update(message="状态已重置")
             case 'v':
                 logger.info(self.game.message())
             case 's':

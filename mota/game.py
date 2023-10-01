@@ -125,7 +125,7 @@ class Game(object):
         m = MONSTERS[monster]
 
         attack = self.attack
-        if monster in (208, 213, 214) and 321 in self.things:  # 十字架
+        if monster in (208, 213, 214) and 55 in self.things:  # 十字架
             attack *= 2
 
         if monster in (257, ) and 62 in self.things:  # 屠龙匕
@@ -402,6 +402,11 @@ class Game(object):
             with open(filename, 'r') as file:
                 reader = csv.reader(file)
                 for level, state, action, x, y in reader:
+                    logger.debug("load state %s %s, %s, (%s, %s)",
+                                 level, state, action, x, y)
+                    if self.level != level:
+                        logger.warning(
+                            "level not match %s != %s", self.level, level)
                     self.execute(action, (int(x), int(y)))
         except Exception as e:
             logger.error('load state error %s', e)
@@ -799,7 +804,7 @@ class Game(object):
             }:
                 self.valid[var] = value
 
-        logger.debug(self.valid)
+        # logger.debug(self.valid)
 
         if not execute:
             return
@@ -817,6 +822,8 @@ class Game(object):
         logger.debug(self.valid)
         logger.debug("select %s", pos)
         level, x, y = pos
+        if self.level != level:
+            return
         self.level = level
         self.execute('move', (x, y))
         if self.level > level:
