@@ -33,22 +33,35 @@ class Game(object):
         # logger.debug("price %s times %d", self.price, self.times)
         return self.price + self.times * 20
 
-    def nearby(self, where, value=None, wall=False):
+    def nearby(self, where, value=None, wall=False, level=None):
         nears = []
+        idx = level
+        if level is None:
+            idx = self.level
+
         for var in [(-1, 0), (1, 0), (0, -1), (0, 1),]:
             var = self.addoffset(where, var)
-            if self.floor[var] == 1 and not wall:
+            if self.tower[idx][var] == 1 and not wall:
                 continue
             if value is None:
                 nears.append(var)
                 continue
-            if self.floor[var] == value:
+            if self.tower[idx][var] == value:
                 nears.append(var)
+
+        if level is not None:
+            nears = [
+                (level, near[0], near[1])
+                for near in nears
+            ]
+
         return nears
 
     def reset(self):
         self.tower = np.copy(maps.M)
         self.masks = np.zeros((51, 13, 13))
+        self.space = {}
+        self.valid = {}
         self.level = 1
         self.max_level = 1
         self.min_level = 1
@@ -63,7 +76,7 @@ class Game(object):
         self.price = 20
         self.times = 0
         self.state = 0
-        self.mode = MODE_ADD
+        self.mode = MODE_SUB
         self.actions = []
         self.events = copy.deepcopy(events.EVENTS)
 
@@ -309,7 +322,7 @@ class Game(object):
         self.clear(where)
 
     def move(self, where):
-        logger.debug('move to %s', where)
+        logger.debug('move to %s %s', where, self.floor[where])
         spot = int(self.floor[where])
 
         match spot:
@@ -706,7 +719,7 @@ class Game(object):
                 self.record(action)
                 self.action_merchant(action)
                 self.state = STATE_NORMAL
-        self.search()
+        self.search(execute=False)
 
     def check(self, where, value):
         if value in {21, 22, 23}:  # 钥匙
@@ -715,8 +728,13 @@ class Game(object):
             return MASK.MASK_VALID1
         if value in range(35, 45):  # 剑盾
             return MASK.MASK_VALID1
-        if value in {87, 88}:  # 楼梯
-            return MASK.MASK_VALID1
+        if value in {87}:  # 楼梯
+            if self.max_level == self.level:
+                return MASK.MASK_VALID1
+            else:
+                return MASK.MASK_VISITED
+        if value in {88}:
+            return MASK.MASK_VISITED
         if value in {81, 82, 83}:
             if GATEKEYS[value] not in self.things:
                 return MASK.MASK_INVALID
@@ -733,10 +751,12 @@ class Game(object):
             return MASK.MASK_VALID3
         if value in {121, }:
             return MASK.MASK_EMPTY
+        if value in {123, 126, }:
+            return MASK.MASK_VALID1
         return MASK.MASK_UNKNOWN
 
-    def search(self):
-        queue = [tuple(self.where)]
+    def search(self, execute=False):
+        queue = [(self.level, self.where[0], self.where[1])]
         visited = set()
 
         while queue:
@@ -744,20 +764,67 @@ class Game(object):
             if pos in visited:
                 continue
             visited.add(pos)
-            self.mask[pos] = MASK.MASK_VISITED.value
 
-            for near in self.nearby(pos):
+            self.masks[pos] = MASK.MASK_VISITED.value
+            if pos in self.space:
+                del self.space[pos]
+
+            nears = self.nearby((pos[1], pos[2]), level=self.level)
+            for near in nears:
                 if near in visited:
                     continue
 
-                value = self.floor[near]
+                value = self.tower[near]
                 if value in {0, 2, 3}:
                     queue.append(near)
                     continue
                 if value in {1, 85, 86}:
                     continue
 
-                self.mask[near] = self.check(near, value).value
+                self.masks[near] = self.check(near, value).value
+                if self.masks[near] not in {
+                    MASK.MASK_VISITED.value,
+                    MASK.MASK_EMPTY.value,
+                }:
+                    self.space[near] = self.masks[near]
+                elif near in self.space:
+                    del self.space[near]
+
+        self.valid = {}
+        for var, value in self.space.items():
+            if value in {
+                MASK.MASK_VALID1.value,
+                MASK.MASK_VALID2.value,
+                MASK.MASK_VALID3.value
+            }:
+                self.valid[var] = value
+
+        logger.debug(self.valid)
+
+        if not execute:
+            return
+
+        if len(self.valid) == 1:
+            pos = list(self.valid.keys())[0]
+            self.select(pos)
+            return
+        for var, value in self.valid.items():
+            if value == MASK.MASK_VALID1.value and var[0] == self.level:
+                self.select(var)
+
+    def select(self, pos):
+        # logger.debug(self.space)
+        logger.debug(self.valid)
+        logger.debug("select %s", pos)
+        level, x, y = pos
+        self.level = level
+        self.execute('move', (x, y))
+        if self.level > level:
+            del self.space[pos]
+            del self.valid[pos]
+
+        # logger.debug(self.space)
+        logger.debug(self.valid)
 
 
 if __name__ == '__main__':

@@ -377,7 +377,7 @@ class Mota(object):
             case 'v':
                 logger.info(self.game.message())
             case 's':
-                self.game.search()
+                self.game.search(execute=True)
             case _:
                 state = self.game.state
                 self.game.execute(event.key)
