@@ -328,7 +328,7 @@ class Mota(object):
         self.resources = {}
         self.icons = self.load_icons()
         self.game = game.Game()
-
+        self.stack = []
         self.setup_matplotlib()
 
         self.fig = plt.figure(figsize=(18, 13))
@@ -357,6 +357,15 @@ class Mota(object):
     def show(self):
         plt.show()
 
+    def execute(self, action, where=(0, 0)):
+        state = self.game.state
+        self.stack.append(copy.deepcopy(self.game))
+        logger.debug(self.stack)
+        self.game.execute(action, where)
+        if state != self.game.state:
+            logger.info(self.game.message())
+        self.update()
+
     def click_event(self, event: matplotlib.backend_bases.MouseEvent):
         # logger.debug(event)
         try:
@@ -365,14 +374,31 @@ class Mota(object):
             return
         data = data.astype(np.int32)
         logger.debug("click location %s", data)
-        state = self.game.state
-        self.game.execute('move', data)
-        if state != self.game.state:
-            logger.info(self.game.message())
-        self.update()
+        self.execute('move', data)
+
+    def validate(self, key):
+        if key in {
+            'ctrl+s',
+            'ctrl+l',
+            'ctrl+n',
+            'ctrl+z',
+            'up',
+            'down',
+            'left',
+            'right',
+            'pageup',
+            'pagedown',
+        }:
+            return True
+        if key in 'qwertyuiofdvs1234':
+            return True
+        return False
 
     def key_press_event(self, event: matplotlib.backend_bases.KeyEvent):
         # logger.debug(event.key)
+        if not self.validate(event.key):
+            return
+
         match event.key:
             case 'ctrl+s':
                 self.game.save_state()
@@ -385,15 +411,19 @@ class Mota(object):
             case 'ctrl+n':
                 self.game.reset()
                 self.update(message="状态已重置")
+            case 'ctrl+z':
+                if self.stack:
+                    logger.debug("ctrl + z")
+                    self.game = self.stack.pop()
+                    self.update()
             case 'v':
                 logger.info(self.game.message())
             case 's':
-                self.game.search(execute=True)
+                game = copy.deepcopy(self.game)
+                if self.game.search(execute=True):
+                    self.stack.append(game)
             case _:
-                state = self.game.state
-                self.game.execute(event.key)
-                if state != self.game.state:
-                    logger.info(self.game.message())
+                self.execute(event.key)
 
         self.update()
 

@@ -807,15 +807,18 @@ class Game(object):
         # logger.debug(self.valid)
 
         if not execute:
-            return
+            return False
 
         if len(self.valid) == 1:
             pos = list(self.valid.keys())[0]
-            self.select(pos)
-            return
+            return self.select(pos)
+
+        flag = False
         for var, value in self.valid.items():
             if value == MASK.MASK_VALID1.value and var[0] == self.level:
-                self.select(var)
+                if self.select(var):
+                    flag = True
+        return flag
 
     def select(self, pos):
         # logger.debug(self.space)
@@ -823,15 +826,13 @@ class Game(object):
         logger.debug("select %s", pos)
         level, x, y = pos
         if self.level != level:
-            return
+            return False
         self.level = level
         self.execute('move', (x, y))
         if self.level > level:
             del self.space[pos]
             del self.valid[pos]
-
-        # logger.debug(self.space)
-        logger.debug(self.valid)
+        return True
 
 
 if __name__ == '__main__':
