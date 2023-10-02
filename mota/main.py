@@ -187,12 +187,15 @@ class Mota(object):
         if idx not in MONSTERS:
             return
 
-        harmful = self.game.harmful(where, idx)
+        harmful, count = self.game.harmful(where, idx)
         # logger.debug(harmful)
         text = Image.new("RGBA", (32, 32))
         draw = ImageDraw.Draw(text)
         draw.text((2, 22), str(harmful), fill='#000000cc',)
         draw.text((1, 21), str(harmful), fill='#db2828ff',)
+
+        draw.text((2, 12), str(count), fill='#000000cc',)
+        draw.text((1, 11), str(count), fill='#a7bd0dff',)
         self.paste_icon(canvas, text, where)
 
     def plotdomain(self, where, idx, canvas):

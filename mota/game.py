@@ -124,7 +124,7 @@ class Game(object):
 
     def harmful(self, where, monster):
         if monster not in MONSTERS:
-            return -1
+            return -1, 0
 
         m = MONSTERS[monster]
 
@@ -158,7 +158,7 @@ class Game(object):
 
         if m.defense >= attack:
             # logger.debug("monster defense >= attack")
-            return -1
+            return -1, 0
 
         mlife = m.life
         total = 0
@@ -168,15 +168,20 @@ class Game(object):
         if special == 1 and hurt > 0:  # 先攻
             total += hurt
 
+        if hurt <= 0:
+            return 0, 0
+
+        count = 0
         while True:
             mlife -= harm
             if mlife <= 0:
                 break
 
+            count += 1
             if hurt > 0:
                 total += hurt
 
-        return total
+        return total, count
 
     def domain(self, where):
         if self.level <= 40:
@@ -267,7 +272,7 @@ class Game(object):
 
     def battle(self, where, monster):
         # logger.debug("%s, %s", where, monster)
-        hurt = self.harmful(where, monster)
+        hurt, count = self.harmful(where, monster)
         if hurt < 0:
             return False
 
@@ -751,7 +756,7 @@ class Game(object):
                 return MASK.MASK_INVALID
             return MASK.MASK_VALID3
         if value in MONSTERS:
-            harm = self.harmful(where, value)
+            harm, count = self.harmful(where, value)
             if harm < self.life:
                 return MASK.MASK_VALID3
 
