@@ -321,7 +321,6 @@ class Mota(object):
         out = Image.alpha_composite(out, mask)
         self.img.set_data(out)
         self.fig.canvas.draw()
-    #     return combined
 
     def __init__(self) -> None:
         logger.info("mota creating...")
@@ -360,7 +359,7 @@ class Mota(object):
     def execute(self, action, where=(0, 0)):
         state = self.game.state
         self.stack.append(copy.deepcopy(self.game))
-        logger.debug(self.stack)
+        # logger.debug(self.stack)
         self.game.execute(action, where)
         if state != self.game.state:
             logger.info(self.game.message())
@@ -401,11 +400,11 @@ class Mota(object):
 
         match event.key:
             case 'ctrl+s':
-                self.game.save_state()
+                self.game.save_state(os.path.join(dirname, 'state.csv'))
                 self.update(message="状态已保存")
                 return
             case 'ctrl+l':
-                self.game.load_state()
+                self.game.load_state(os.path.join(dirname, 'state.csv'))
                 self.update(message="状态已加载")
                 return
             case 'ctrl+n':

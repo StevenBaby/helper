@@ -85,11 +85,15 @@ class Game(object):
 
     def record(self, action, where=(0, 0)):
         self.actions.append((
-            self.level,
             self.state,
             action,
+            self.level,
             where[0],
-            where[1]
+            where[1],
+            self.life,
+            self.attack,
+            self.defense,
+            self.coin,
         ))
 
     def domainful(self, where):
@@ -322,7 +326,8 @@ class Game(object):
         self.clear(where)
 
     def move(self, where):
-        logger.debug('move to %s %s', where, self.floor[where])
+        logger.debug('move to %s -> %s', (self.level,
+                     where[0], where[1]), self.floor[where])
         spot = int(self.floor[where])
 
         match spot:
@@ -401,13 +406,12 @@ class Game(object):
             self.reset()
             with open(filename, 'r') as file:
                 reader = csv.reader(file)
-                for level, state, action, x, y in reader:
-                    logger.debug("load state %s %s, %s, (%s, %s)",
-                                 level, state, action, x, y)
-                    if self.level != level:
+                for step in reader:
+                    logger.debug("load step %s", step)
+                    if self.level != int(step[2]):
                         logger.warning(
-                            "level not match %s != %s", self.level, level)
-                    self.execute(action, (int(x), int(y)))
+                            "level not match %s != %s", self.level, step[2])
+                    self.execute(step[1], (int(step[3]), int(step[4])))
         except Exception as e:
             logger.error('load state error %s', e)
             return
@@ -822,11 +826,12 @@ class Game(object):
 
     def select(self, pos):
         # logger.debug(self.space)
-        logger.debug(self.valid)
-        logger.debug("select %s", pos)
+        # logger.debug(self.valid)
+
         level, x, y = pos
         if self.level != level:
             return False
+        logger.debug("select %s", pos)
         self.level = level
         self.execute('move', (x, y))
         if self.level > level:
