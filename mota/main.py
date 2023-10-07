@@ -236,7 +236,11 @@ class Mota(object):
     def plottext(self, canvas, text, where, height=1):
         icon = Image.new("RGBA", (32 * 5, 32 * height))
         draw = ImageDraw.Draw(icon)
-        font = ImageFont.truetype('simhei.ttf', 12)
+
+        if os.name == 'nt':
+            font = ImageFont.truetype('simhei.ttf', 12)
+        else:
+            font = ImageFont.truetype('wqy-zenhei.ttc', 10)
         # draw.rectangle((2, 10, 30, 20), fill='#00000077')
         draw.text((4, 11), str(text), fill='#2185d0', font=font,
                   stroke_width=2,
@@ -333,7 +337,7 @@ class Mota(object):
         self.stack = []
         self.setup_matplotlib()
 
-        self.fig = plt.figure(figsize=(18, 13))
+        self.fig = plt.figure(figsize=(9, 13 / 2))
         self.fig.tight_layout()
         self.fig.subplots_adjust(
             top=1,

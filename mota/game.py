@@ -76,7 +76,7 @@ class Game(object):
         self.price = 20
         self.times = 0
         self.state = 0
-        self.mode = MODE_SUB
+        self.mode = MODE_ADD
         self.actions = []
         self.events = copy.deepcopy(events.EVENTS)
 

@@ -385,19 +385,29 @@ EVENTS: dict[int, list[Event]] = {
         ),
         Event(
             MatchWhere(10, 6),
-            AssignSpecial({
-                32: {
-                    (9, 6): 1,
-                }
-            })
+            [
+                AssignAttr('where', (10, 6)),
+                AssignFloor({
+                    (10, 6): 0,
+                }),
+                AssignSpecial({
+                    32: {
+                        (9, 6): 1,
+                    }
+                }),
+            ]
         ),
     ],
     33: [
         Event(
             MatchWhere(10, 9),
-            AssignFloor({
-                (10, 8): 1,
-            }),
+            [
+                AssignAttr('where', (10, 9)),
+                AssignFloor({
+                    (10, 8): 1,
+                    (10, 9): 0,
+                }),
+            ]
         ),
         Event(
             MatchWhere(5, 10),
@@ -472,9 +482,13 @@ EVENTS: dict[int, list[Event]] = {
         ),
         Event(
             MatchWhere(6, 2),
-            AssignFloor({
-                (5, 2): 1,
-            }),
+            [
+                AssignAttr('where', (6, 2)),
+                AssignFloor({
+                    (5, 2): 1,
+                    (6, 2): 0,
+                }),
+            ]
         ),
     ],
     39: [
@@ -501,9 +515,13 @@ EVENTS: dict[int, list[Event]] = {
                     (8, 6): 0,
                 })
             ],
-            AssignFloor({
-                (8, 6): 85,
-            }),
+            [
+                AssignAttr('where', (7, 6)),
+                AssignFloor({
+                    (8, 6): 85,
+                    (7, 6): 0,
+                }),
+            ]
         ),
         Event(
             [
@@ -674,8 +692,10 @@ EVENTS: dict[int, list[Event]] = {
         Event(
             MatchWhere(6, 6),
             [
+                AssignAttr('where', (6, 6)),
                 AssignFloor({
                     (7, 6): 85,
+                    (6, 6): 0,
                     (0, 0): 324,
                     (2, 5): a([
                         [246, 246, 246,],
